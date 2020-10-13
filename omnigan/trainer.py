@@ -631,10 +631,7 @@ class Trainer:
             self.run_epoch()
             self.run_evaluation(verbose=1)
 
-            if (
-                self.logger.epoch != 0
-                and self.logger.epoch % self.opts.train.save_n_epochs == 0
-            ):
+            if self.logger.epoch % self.opts.train.save_n_epochs == 0:
                 self.save()
 
     def get_g_loss(self, multi_domain_batch, verbose=0):
@@ -778,22 +775,40 @@ class Trainer:
 
                     if batch_domain == "r":
                         # Entropy minimization loss
-                        if self.opts.gen.s.use_minent:
+                        if self.opts.gen.s.use_minient:
                             # Direct entropy minimization
                             update_loss = (
-                                self.losses["G"]["tasks"][update_task]["minent"](
+                                self.losses["G"]["tasks"][update_task]["minient"](
                                     prediction
                                 )
-                                * lambdas.G[update_task]["minent"]
+                                * lambdas.G[update_task]["minient"]
                             )
                             step_loss += update_loss
 
-                            self.logger.losses.gen.task[update_task]["minent"][
+                            self.logger.losses.gen.task[update_task]["minient"][
                                 batch_domain
                             ] = update_loss.item()
 
                         # Fool ADVENT discriminator
-                        if self.opts.gen.s.use_advent:
+                        if self.opts.gen.s.common_advent:
+                            d_out = self.losses["G"]["tasks"][update_task]["advent"](
+                                prediction,
+                                self.domain_labels["s"],
+                                self.D["common"]["Advent_layer_s"],
+                                d_out_only=True,
+                            )
+                            update_loss = (
+                                self.losses["G"]["tasks"][update_task]["common_advent"](
+                                    self.D["common"]["Advent_common_layer"](d_out),
+                                    self.domain_labels["s"],
+                                )
+                                * lambdas.G[update_task]["advent"]
+                            )
+                            step_loss += update_loss
+                            self.logger.losses.gen.task[update_task]["advent"][
+                                batch_domain
+                            ] = update_loss.item()
+                        elif self.opts.gen.s.use_advent:
                             update_loss = (
                                 self.losses["G"]["tasks"][update_task]["advent"](
                                     prediction,
@@ -835,6 +850,22 @@ class Trainer:
                         batch_domain
                     ] = update_loss.item()
 
+                    # Then Compare loss
+                    if self.opts.gen.m.use_compare_loss:
+                        if self.verbose > 0:
+                            print("Using compare loss.")
+                        update_loss = (
+                            self.losses["G"]["tasks"][update_task]["compare"](
+                                prediction, update_target
+                            )
+                            * lambdas.G[update_task]["compare"]
+                        )
+                        step_loss += update_loss
+                        self.logger.losses.gen.task[update_task]["compare"][
+                            batch_domain
+                        ] = update_loss.item()
+
+                    # ADVENT
                     if batch_domain == "r":
                         pred_complementary = 1 - prediction
                         prob = torch.cat([prediction, pred_complementary], dim=1)
@@ -850,8 +881,25 @@ class Trainer:
                             self.logger.losses.gen.task["m"]["minent"][
                                 "r"
                             ] = update_loss.item()
-
-                        if self.opts.gen.m.use_advent:
+                        if self.opts.gen.m.common_advent:
+                            d_out = self.losses["G"]["tasks"][update_task]["advent"](
+                                prediction,
+                                self.domain_labels["s"],
+                                self.D["common"]["Advent_layer_m"],
+                                d_out_only=True,
+                            )
+                            update_loss = (
+                                self.losses["G"]["tasks"][update_task]["common_advent"](
+                                    self.D["common"]["Advent_common_layer"](d_out),
+                                    self.domain_labels["s"],
+                                )
+                                * self.opts.train.lambdas.advent.adv_main
+                            )
+                            step_loss += update_loss
+                            self.logger.losses.gen.task["m"]["advent"][
+                                batch_domain
+                            ] = update_loss.item()
+                        elif self.opts.gen.m.use_advent:
                             # Then Advent loss
                             update_loss = (
                                 self.losses["G"]["tasks"]["m"]["advent"](
@@ -1292,7 +1340,7 @@ class Trainer:
         self.G.load_state_dict(checkpoint["G"])
         if not ("m" in self.opts.tasks and "p" in self.opts.tasks):
             self.g_opt.load_state_dict(checkpoint["g_opt"])
-        self.logger.epoch = checkpoint["epoch"]
+        self.logger.epoch = checkpoint["epoch"] + 1
         self.logger.global_step = checkpoint["step"]
 
         # resume scheduler:

@@ -280,7 +280,7 @@ class SIMSELoss(nn.Module):
 class SIGMLoss(nn.Module):
     """loss from MiDaS paper
     MiDaS did not specify how the gradients were computed but we use Sobel filters which approximate
-    the derivative of an image.
+    the derivative of an image. 
     """
 
     def __init__(self, gmweight=0.5, scale=4, device="cuda"):
@@ -328,6 +328,15 @@ class ContextLoss(nn.Module):
 
     def __call__(self, input, target, mask):
         return torch.mean(torch.abs(torch.mul((input - target), 1 - mask)))
+
+
+class CompareLoss(nn.Module):
+    """
+    Penalize areas in ground seg but not in flood mask
+    """
+
+    def __call__(self, pred, pseudo_ground):
+        return torch.mean(1.0 * ((pseudo_ground - pred) > 0.5))
 
 
 ##################################################################################
@@ -430,6 +439,7 @@ def get_losses(opts, verbose, device=None):
         losses["G"]["tasks"]["s"]["crossent"] = CrossEntropy()
         losses["G"]["tasks"]["s"]["minent"] = MinEntLoss()
         losses["G"]["tasks"]["s"]["advent"] = ADVENTAdversarialLoss(opts)
+        losses["G"]["tasks"]["s"]["common_advent"] = CustomBCELoss()
     if "m" in opts.tasks:
         losses["G"]["tasks"]["m"] = {}
         losses["G"]["tasks"]["m"]["bce"] = nn.BCELoss()
@@ -441,7 +451,8 @@ def get_losses(opts, verbose, device=None):
             losses["G"]["tasks"]["m"]["minent"] = entropy_loss
         losses["G"]["tasks"]["m"]["tv"] = TVLoss()
         losses["G"]["tasks"]["m"]["advent"] = ADVENTAdversarialLoss(opts)
-
+        losses["G"]["tasks"]["m"]["compare"] = CompareLoss()
+        losses["G"]["tasks"]["m"]["common_advent"] = CustomBCELoss()
     # undistinguishable features loss
     # TODO setup a get_losses func to assign the right loss according to the yaml
     if opts.classifier.loss == "l1":
@@ -476,7 +487,7 @@ def prob_2_entropy(prob):
 class CustomBCELoss(nn.Module):
     """
         The first argument is a tensor and the second arguement is an int.
-        There is no need to take simoid before calling this function.
+        There is no need to take sigmoid before calling this function.
     """
 
     def __init__(self):
@@ -494,7 +505,7 @@ class CustomBCELoss(nn.Module):
 
 class ADVENTAdversarialLoss(nn.Module):
     """
-        TODO
+        The first and second argument are tensor. The third argument is a discriminator model.
     """
 
     def __init__(self, opts):
@@ -502,15 +513,23 @@ class ADVENTAdversarialLoss(nn.Module):
         self.opts = opts
         self.loss = CustomBCELoss()
 
-    def __call__(self, prediction, target, discriminator):
+    def __call__(self, prediction, target, discriminator, d_out_only=False):
         d_out = discriminator(prob_2_entropy(F.softmax(prediction, dim=1)))
         if self.opts.dis.m.architecture == "OmniDiscriminator":
             d_out = multiDiscriminatorAdapter(d_out, self.opts)
-        loss_ = self.loss(d_out, target)
-        return loss_
+        if d_out_only:
+            return d_out
+        else:
+            loss_ = self.loss(d_out, target)
+            return loss_
 
 
 def multiDiscriminatorAdapter(d_out, opts):
+    """
+    Because the OmniDiscriminator does not directly return a tensor (but a list of tensor).
+    Since there is no multilevel masker, the 0th tensor in the list is all we want.
+    This Adapter returns the first element(tensor) of the list that OmniDiscriminator returns.
+    """
     if (
         isinstance(d_out, list) and len(d_out) == 1
     ):  # adapt the multi-scale Omnidiscriminator
