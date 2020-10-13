@@ -883,7 +883,7 @@ class Trainer:
                             ] = update_loss.item()
                         if self.opts.gen.m.common_advent:
                             d_out = self.losses["G"]["tasks"][update_task]["advent"](
-                                prediction,
+                                prob,
                                 self.domain_labels["s"],
                                 self.D["common"]["Advent_layer_m"],
                                 d_out_only=True,
