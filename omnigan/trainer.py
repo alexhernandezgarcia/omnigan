@@ -1154,7 +1154,27 @@ class Trainer:
             else:
                 z = self.G.encode(x)
                 if "m" in self.opts.tasks:
-                    if self.opts.gen.m.use_advent:
+                    if self.opts.gen.m.common_advent:
+                        fake_mask = self.G.decoders["m"](z)
+                        fake_complementary_mask = 1 - fake_mask
+                        prob = torch.cat([fake_mask, fake_complementary_mask], dim=1)
+                        prob = prob.detach()
+
+                        d_out = self.losses["G"]["tasks"]["m"]["advent"](
+                            prob.to(self.device),
+                            self.domain_labels["s"],
+                            self.D["common"]["Advent_layer_m"],
+                            d_out_only=True,
+                        )
+
+                        loss_main = self.losses["G"]["tasks"]["m"]["common_advent"](
+                            self.D["common"]["Advent_common_layer"](d_out),
+                            self.domain_labels["s"],
+                        )
+                        disc_loss["m"]["Advent"] += (
+                            self.opts.train.lambdas.advent.adv_main * loss_main
+                        )
+                    elif self.opts.gen.m.use_advent:
                         if verbose > 0:
                             print("Now training the ADVENT discriminator!")
                         fake_mask = self.G.decoders["m"](z)
@@ -1172,7 +1192,26 @@ class Trainer:
                             self.opts.train.lambdas.advent.adv_main * loss_main
                         )
                 if "s" in self.opts.tasks:
-                    if self.opts.gen.s.use_advent:
+                    if self.opts.gen.s.common_advent:
+                        preds = self.G.decoders["s"](z)
+                        preds = preds.detach()
+
+                        d_out = self.losses["G"]["tasks"]["s"]["advent"](
+                            preds.to(self.device),
+                            self.domain_labels["s"],
+                            self.D["common"]["Advent_layer_s"],
+                            d_out_only=True,
+                        )
+
+                        loss_main = self.losses["G"]["tasks"]["s"]["common_advent"](
+                            self.D["common"]["Advent_common_layer"](d_out),
+                            self.domain_labels["s"],
+                        )
+
+                        disc_loss["m"]["Advent"] += (
+                            self.opts.train.lambdas.advent.adv_main * loss_main
+                        )
+                    elif self.opts.gen.s.use_advent:
                         preds = self.G.decoders["s"](z)
                         preds = preds.detach()
 
