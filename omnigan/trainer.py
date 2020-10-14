@@ -31,6 +31,7 @@ from omnigan.tutils import (
     vgg_preprocess,
     norm_tensor,
     zero_grad,
+    aug_probmap,
 )
 from omnigan.utils import div_dict, flatten_opts, sum_dict, merge, get_display_indices
 from omnigan.eval_metrics import iou, accuracy
@@ -751,76 +752,6 @@ class Trainer:
                     self.logger.losses.gen.task[update_task][
                         batch_domain
                     ] = update_loss.item()
-                elif update_task == "s":
-                    prediction = self.G.decoders[update_task](self.z)
-                    # Supervised segmentation loss: crossent for sim domain,
-                    # crossent_pseudo for real ; loss is crossent in any case
-                    if batch_domain == "s" or self.opts.gen.s.use_pseudo_labels:
-                        if batch_domain == "s":
-                            loss_name = "crossent"
-                        else:
-                            loss_name = "crossent_pseudo"
-
-                        update_loss = (
-                            self.losses["G"]["tasks"]["s"]["crossent"](
-                                prediction, update_target.squeeze(1)
-                            )
-                            * lambdas.G["s"][loss_name]
-                        )
-                        step_loss += update_loss
-
-                        self.logger.losses.gen.task["s"][loss_name][
-                            batch_domain
-                        ] = update_loss.item()
-
-                    if batch_domain == "r":
-                        # Entropy minimization loss
-                        if self.opts.gen.s.use_minient:
-                            # Direct entropy minimization
-                            update_loss = (
-                                self.losses["G"]["tasks"][update_task]["minient"](
-                                    prediction
-                                )
-                                * lambdas.G[update_task]["minient"]
-                            )
-                            step_loss += update_loss
-
-                            self.logger.losses.gen.task[update_task]["minient"][
-                                batch_domain
-                            ] = update_loss.item()
-
-                        # Fool ADVENT discriminator
-                        if self.opts.gen.s.common_advent:
-                            d_out = self.losses["G"]["tasks"][update_task]["advent"](
-                                prediction,
-                                self.domain_labels["s"],
-                                self.D["common"]["Advent_layer_s"],
-                                d_out_only=True,
-                            )
-                            update_loss = (
-                                self.losses["G"]["tasks"][update_task]["common_advent"](
-                                    self.D["common"]["Advent_common_layer"](d_out),
-                                    self.domain_labels["s"],
-                                )
-                                * lambdas.G[update_task]["advent"]
-                            )
-                            step_loss += update_loss
-                            self.logger.losses.gen.task[update_task]["advent"][
-                                batch_domain
-                            ] = update_loss.item()
-                        elif self.opts.gen.s.use_advent:
-                            update_loss = (
-                                self.losses["G"]["tasks"][update_task]["advent"](
-                                    prediction,
-                                    self.domain_labels["s"],
-                                    self.D["s"]["Advent"],
-                                )
-                                * lambdas.G[update_task]["advent"]
-                            )
-                            step_loss += update_loss
-                            self.logger.losses.gen.task[update_task]["advent"][
-                                batch_domain
-                            ] = update_loss.item()
                 elif update_task == "m":
                     # ? output features classifier
                     prediction = self.G.decoders["m"](self.z)
@@ -882,15 +813,20 @@ class Trainer:
                                 "r"
                             ] = update_loss.item()
                         if self.opts.gen.m.common_advent:
+                            prediction_s = self.G.decoders["s"](self.z)
+                            prob_all = torch.cat([prediction_s, prob], dim=1)
                             d_out = self.losses["G"]["tasks"][update_task]["advent"](
-                                prob,
+                                prob_all,
                                 self.domain_labels["s"],
-                                self.D["common"]["Advent_layer_m"],
+                                self.D["common"]["Advent_common_layer"],
                                 d_out_only=True,
                             )
+                            d_out_m = d_out[:, 11:, :, :]
                             update_loss = (
                                 self.losses["G"]["tasks"][update_task]["common_advent"](
-                                    self.D["common"]["Advent_common_layer"](d_out),
+                                    self.D["common"]["Advent_notshared_layer_m"](
+                                        d_out_m
+                                    ),
                                     self.domain_labels["s"],
                                 )
                                 * self.opts.train.lambdas.advent.adv_main
@@ -913,6 +849,74 @@ class Trainer:
                             self.logger.losses.gen.task["m"]["advent"][
                                 batch_domain
                             ] = update_loss.item()
+                elif update_task == "s":
+                    prediction = self.G.decoders[update_task](self.z)
+                    # Supervised segmentation loss: crossent for sim domain,
+                    # crossent_pseudo for real ; loss is crossent in any case
+                    if batch_domain == "s" or self.opts.gen.s.use_pseudo_labels:
+                        if batch_domain == "s":
+                            loss_name = "crossent"
+                        else:
+                            loss_name = "crossent_pseudo"
+
+                        update_loss = (
+                            self.losses["G"]["tasks"]["s"]["crossent"](
+                                prediction, update_target.squeeze(1)
+                            )
+                            * lambdas.G["s"][loss_name]
+                        )
+                        step_loss += update_loss
+
+                        self.logger.losses.gen.task["s"][loss_name][
+                            batch_domain
+                        ] = update_loss.item()
+
+                    if batch_domain == "r":
+                        # Entropy minimization loss
+                        if self.opts.gen.s.use_minent:
+                            # Direct entropy minimization
+                            update_loss = (
+                                self.losses["G"]["tasks"][update_task]["minent"](
+                                    prediction
+                                )
+                                * lambdas.G[update_task]["minent"]
+                            )
+                            step_loss += update_loss
+
+                            self.logger.losses.gen.task[update_task]["minent"][
+                                batch_domain
+                            ] = update_loss.item()
+
+                        # Fool ADVENT discriminator
+                        if self.opts.gen.s.common_advent:
+                            d_out_s = d_out[:, :11, :, :]
+                            update_loss = (
+                                self.losses["G"]["tasks"][update_task]["common_advent"](
+                                    self.D["common"]["Advent_notshared_layer_s"](
+                                        d_out_s
+                                    ),
+                                    self.domain_labels["s"],
+                                )
+                                * lambdas.G[update_task]["advent"]
+                            )
+                            step_loss += update_loss
+                            self.logger.losses.gen.task[update_task]["advent"][
+                                batch_domain
+                            ] = update_loss.item()
+                        elif self.opts.gen.s.use_advent:
+                            update_loss = (
+                                self.losses["G"]["tasks"][update_task]["advent"](
+                                    prediction,
+                                    self.domain_labels["s"],
+                                    self.D["s"]["Advent"],
+                                )
+                                * lambdas.G[update_task]["advent"]
+                            )
+                            step_loss += update_loss
+                            self.logger.losses.gen.task[update_task]["advent"][
+                                batch_domain
+                            ] = update_loss.item()
+
         return step_loss
 
     def sample_z(self, batch_size):
@@ -1157,18 +1161,21 @@ class Trainer:
                     if self.opts.gen.m.common_advent:
                         fake_mask = self.G.decoders["m"](z)
                         fake_complementary_mask = 1 - fake_mask
-                        prob = torch.cat([fake_mask, fake_complementary_mask], dim=1)
-                        prob = prob.detach()
+                        preds_s = self.G.decoders["s"](z)
+                        all_prob = torch.cat(
+                            [preds_s, fake_mask, fake_complementary_mask], dim=1
+                        )
+                        all_prob = all_prob.detach()
 
                         d_out = self.losses["G"]["tasks"]["m"]["advent"](
-                            prob.to(self.device),
+                            all_prob.to(self.device),
                             self.domain_labels["s"],
-                            self.D["common"]["Advent_layer_m"],
+                            self.D["common"]["Advent_common_layer"],
                             d_out_only=True,
                         )
-
+                        d_out_m = d_out[:, :11, :, :]
                         loss_main = self.losses["G"]["tasks"]["m"]["common_advent"](
-                            self.D["common"]["Advent_common_layer"](d_out),
+                            self.D["common"]["Advent_notshared_layer_m"](d_out_m),
                             self.domain_labels["s"],
                         )
                         disc_loss["m"]["Advent"] += (
@@ -1193,18 +1200,9 @@ class Trainer:
                         )
                 if "s" in self.opts.tasks:
                     if self.opts.gen.s.common_advent:
-                        preds = self.G.decoders["s"](z)
-                        preds = preds.detach()
-
-                        d_out = self.losses["G"]["tasks"]["s"]["advent"](
-                            preds.to(self.device),
-                            self.domain_labels["s"],
-                            self.D["common"]["Advent_layer_s"],
-                            d_out_only=True,
-                        )
-
+                        d_out_s = d_out[:, 11:, :, :]
                         loss_main = self.losses["G"]["tasks"]["s"]["common_advent"](
-                            self.D["common"]["Advent_common_layer"](d_out),
+                            self.D["common"]["Advent_notshared_layer_s"](d_out_s),
                             self.domain_labels["s"],
                         )
 

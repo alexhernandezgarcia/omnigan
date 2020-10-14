@@ -212,8 +212,8 @@ def decode_unity_depth_t(unity_depth, log=True, normalize=False, numpy=False, fa
     R = ((247 - R) / 8).type(torch.IntTensor)
     G = ((247 - G) / 8).type(torch.IntTensor)
     B = (255 - B).type(torch.IntTensor)
-    depth = ((R * 256 * 31 + G * 256 + B).type(torch.FloatTensor)) / (256 * 31 * 31 -1)
-    depth = (depth * far)
+    depth = ((R * 256 * 31 + G * 256 + B).type(torch.FloatTensor)) / (256 * 31 * 31 - 1)
+    depth = depth * far
     depth = 1 / depth
     depth = depth.unsqueeze(0)  # (depth * far).unsqueeze(0)
 
@@ -371,3 +371,16 @@ def zero_grad(model: nn.Module):
     """
     for p in model.parameters():
         p.grad = None
+
+
+def aug_probmap(tensor, aug_ndim, aug_before=True):
+    """
+    TODO
+    """
+    n, c, h, w, = tensor.shape
+    tmp = torch.ones([c, aug_ndim, h, w]) * 0.5
+    if aug_before:
+        return torch.cat([tmp, tensor], dim=1)
+    else:
+        return torch.cat([tensor, tmp], dim=1)
+
