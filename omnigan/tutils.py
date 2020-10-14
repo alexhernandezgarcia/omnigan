@@ -371,16 +371,3 @@ def zero_grad(model: nn.Module):
     """
     for p in model.parameters():
         p.grad = None
-
-
-def aug_probmap(tensor, aug_ndim, aug_before=True):
-    """
-    TODO
-    """
-    n, c, h, w, = tensor.shape
-    tmp = torch.ones([c, aug_ndim, h, w]) * 0.5
-    if aug_before:
-        return torch.cat([tmp, tensor], dim=1)
-    else:
-        return torch.cat([tensor, tmp], dim=1)
-

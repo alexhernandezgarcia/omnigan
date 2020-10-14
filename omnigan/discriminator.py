@@ -267,9 +267,9 @@ class OmniDiscriminator(nn.ModuleDict):
         ):
             self["common"] = nn.ModuleDict(
                 {
-                    "Advent_common_layer": get_advent_common_layers(num_classes=13),
-                    "Advent_notshared_layer_m": get_advent_notshared_layers(),
-                    "Advent_notshared_layer_s": get_advent_notshared_layers(),
+                    "Advent_common_layer": get_fc_discriminator(num_classes=13),
+                    # "Advent_notshared_layer_m": get_advent_notshared_layers(),
+                    # "Advent_notshared_layer_s": get_advent_notshared_layers(),
                 }
             )
         elif "m" in opts.tasks:
@@ -315,23 +315,23 @@ def get_fc_discriminator(num_classes=2, ndf=64):
     )
 
 
-def get_advent_common_layers(num_classes=2, ndf=64):
-    return torch.nn.Sequential(
-        torch.nn.Conv2d(num_classes, ndf, kernel_size=4, stride=2, padding=1),
-        torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
-        torch.nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1),
-        torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
-    )
+# def get_advent_common_layers(num_classes=2, ndf=64):
+#     return torch.nn.Sequential(
+#         torch.nn.Conv2d(num_classes, ndf, kernel_size=4, stride=2, padding=1),
+#         torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
+#         torch.nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1),
+#         torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
+#     )
 
 
-def get_advent_notshared_layers(ndf=64):
-    return torch.nn.Sequential(
-        torch.nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1),
-        torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
-        torch.nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1),
-        torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
-        torch.nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1),
-    )
+# def get_advent_notshared_layers(ndf=64):
+#     return torch.nn.Sequential(
+#         torch.nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1),
+#         torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
+#         torch.nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1),
+#         torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
+#         torch.nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1),
+#     )
 
 
 # log:

@@ -31,7 +31,6 @@ from omnigan.tutils import (
     vgg_preprocess,
     norm_tensor,
     zero_grad,
-    aug_probmap,
 )
 from omnigan.utils import div_dict, flatten_opts, sum_dict, merge, get_display_indices
 from omnigan.eval_metrics import iou, accuracy
@@ -819,36 +818,39 @@ class Trainer:
                                 prob_all,
                                 self.domain_labels["s"],
                                 self.D["common"]["Advent_common_layer"],
-                                d_out_only=True,
+                                d_out_only=False,
                             )
-                            d_out_m = d_out[:, 11:, :, :]
                             update_loss = (
-                                self.losses["G"]["tasks"][update_task]["common_advent"](
-                                    self.D["common"]["Advent_notshared_layer_m"](
-                                        d_out_m
-                                    ),
-                                    self.domain_labels["s"],
-                                )
-                                * self.opts.train.lambdas.advent.adv_main
+                                d_out * self.opts.train.lambdas.advent.adv_main
                             )
+                            # d_out_m = d_out[:, 11:, :, :]
+                            # update_loss = (
+                            #     self.losses["G"]["tasks"][update_task]["common_advent"](
+                            #         self.D["common"]["Advent_notshared_layer_m"](
+                            #             d_out_m
+                            #         ),
+                            #         self.domain_labels["s"],
+                            #     )
+                            #     * self.opts.train.lambdas.advent.adv_main
+                            # )
                             step_loss += update_loss
                             self.logger.losses.gen.task["m"]["advent"][
                                 batch_domain
                             ] = update_loss.item()
-                        elif self.opts.gen.m.use_advent:
-                            # Then Advent loss
-                            update_loss = (
-                                self.losses["G"]["tasks"]["m"]["advent"](
-                                    prob.to(self.device),
-                                    self.domain_labels["s"],
-                                    self.D["m"]["Advent"],
-                                )
-                                * self.opts.train.lambdas.advent.adv_main
-                            )
-                            step_loss += update_loss
-                            self.logger.losses.gen.task["m"]["advent"][
-                                batch_domain
-                            ] = update_loss.item()
+                        # elif self.opts.gen.m.use_advent:
+                        #     # Then Advent loss
+                        #     update_loss = (
+                        #         self.losses["G"]["tasks"]["m"]["advent"](
+                        #             prob.to(self.device),
+                        #             self.domain_labels["s"],
+                        #             self.D["m"]["Advent"],
+                        #         )
+                        #         * self.opts.train.lambdas.advent.adv_main
+                        #     )
+                        #     step_loss += update_loss
+                        #     self.logger.losses.gen.task["m"]["advent"][
+                        #         batch_domain
+                        #     ] = update_loss.item()
                 elif update_task == "s":
                     prediction = self.G.decoders[update_task](self.z)
                     # Supervised segmentation loss: crossent for sim domain,
@@ -888,34 +890,34 @@ class Trainer:
                             ] = update_loss.item()
 
                         # Fool ADVENT discriminator
-                        if self.opts.gen.s.common_advent:
-                            d_out_s = d_out[:, :11, :, :]
-                            update_loss = (
-                                self.losses["G"]["tasks"][update_task]["common_advent"](
-                                    self.D["common"]["Advent_notshared_layer_s"](
-                                        d_out_s
-                                    ),
-                                    self.domain_labels["s"],
-                                )
-                                * lambdas.G[update_task]["advent"]
-                            )
-                            step_loss += update_loss
-                            self.logger.losses.gen.task[update_task]["advent"][
-                                batch_domain
-                            ] = update_loss.item()
-                        elif self.opts.gen.s.use_advent:
-                            update_loss = (
-                                self.losses["G"]["tasks"][update_task]["advent"](
-                                    prediction,
-                                    self.domain_labels["s"],
-                                    self.D["s"]["Advent"],
-                                )
-                                * lambdas.G[update_task]["advent"]
-                            )
-                            step_loss += update_loss
-                            self.logger.losses.gen.task[update_task]["advent"][
-                                batch_domain
-                            ] = update_loss.item()
+                        # if self.opts.gen.s.common_advent:
+                        #     d_out_s = d_out[:, :11, :, :]
+                        #     update_loss = (
+                        #         self.losses["G"]["tasks"][update_task]["common_advent"](
+                        #             self.D["common"]["Advent_notshared_layer_s"](
+                        #                 d_out_s
+                        #             ),
+                        #             self.domain_labels["s"],
+                        #         )
+                        #         * lambdas.G[update_task]["advent"]
+                        #     )
+                        #     step_loss += update_loss
+                        #     self.logger.losses.gen.task[update_task]["advent"][
+                        #         batch_domain
+                        #     ] = update_loss.item()
+                        # elif self.opts.gen.s.use_advent:
+                        #     update_loss = (
+                        #         self.losses["G"]["tasks"][update_task]["advent"](
+                        #             prediction,
+                        #             self.domain_labels["s"],
+                        #             self.D["s"]["Advent"],
+                        #         )
+                        #         * lambdas.G[update_task]["advent"]
+                        #     )
+                        #     step_loss += update_loss
+                        #     self.logger.losses.gen.task[update_task]["advent"][
+                        #         batch_domain
+                        #     ] = update_loss.item()
 
         return step_loss
 
@@ -1120,7 +1122,7 @@ class Trainer:
 
         disc_loss = {
             "m": {"Advent": 0},
-            "s": {"Advent": 0},
+            # "s": {"Advent": 0},
             "p": {"global": 0, "local": 0},
         }
 
@@ -1167,61 +1169,61 @@ class Trainer:
                         )
                         all_prob = all_prob.detach()
 
-                        d_out = self.losses["G"]["tasks"]["m"]["advent"](
+                        loss_main = self.losses["G"]["tasks"]["m"]["advent"](
                             all_prob.to(self.device),
                             self.domain_labels["s"],
                             self.D["common"]["Advent_common_layer"],
-                            d_out_only=True,
+                            d_out_only=False,
                         )
-                        d_out_m = d_out[:, :11, :, :]
-                        loss_main = self.losses["G"]["tasks"]["m"]["common_advent"](
-                            self.D["common"]["Advent_notshared_layer_m"](d_out_m),
-                            self.domain_labels["s"],
-                        )
+                        # d_out_m = d_out[:, :11, :, :]
+                        # loss_main = self.losses["G"]["tasks"]["m"]["common_advent"](
+                        #     self.D["common"]["Advent_notshared_layer_m"](d_out_m),
+                        #     self.domain_labels["s"],
+                        # )
                         disc_loss["m"]["Advent"] += (
                             self.opts.train.lambdas.advent.adv_main * loss_main
                         )
-                    elif self.opts.gen.m.use_advent:
-                        if verbose > 0:
-                            print("Now training the ADVENT discriminator!")
-                        fake_mask = self.G.decoders["m"](z)
-                        fake_complementary_mask = 1 - fake_mask
-                        prob = torch.cat([fake_mask, fake_complementary_mask], dim=1)
-                        prob = prob.detach()
+                    # elif self.opts.gen.m.use_advent:
+                    #     if verbose > 0:
+                    #         print("Now training the ADVENT discriminator!")
+                    #     fake_mask = self.G.decoders["m"](z)
+                    #     fake_complementary_mask = 1 - fake_mask
+                    #     prob = torch.cat([fake_mask, fake_complementary_mask], dim=1)
+                    #     prob = prob.detach()
 
-                        loss_main = self.losses["D"]["advent"](
-                            prob.to(self.device),
-                            self.domain_labels[batch_domain],
-                            self.D["m"]["Advent"],
-                        )
+                    #     loss_main = self.losses["D"]["advent"](
+                    #         prob.to(self.device),
+                    #         self.domain_labels[batch_domain],
+                    #         self.D["m"]["Advent"],
+                    #     )
 
-                        disc_loss["m"]["Advent"] += (
-                            self.opts.train.lambdas.advent.adv_main * loss_main
-                        )
-                if "s" in self.opts.tasks:
-                    if self.opts.gen.s.common_advent:
-                        d_out_s = d_out[:, 11:, :, :]
-                        loss_main = self.losses["G"]["tasks"]["s"]["common_advent"](
-                            self.D["common"]["Advent_notshared_layer_s"](d_out_s),
-                            self.domain_labels["s"],
-                        )
+                    #     disc_loss["m"]["Advent"] += (
+                    #         self.opts.train.lambdas.advent.adv_main * loss_main
+                    #     )
+                # if "s" in self.opts.tasks:
+                #     if self.opts.gen.s.common_advent:
+                #         d_out_s = d_out[:, 11:, :, :]
+                #         loss_main = self.losses["G"]["tasks"]["s"]["common_advent"](
+                #             self.D["common"]["Advent_notshared_layer_s"](d_out_s),
+                #             self.domain_labels["s"],
+                #         )
 
-                        disc_loss["m"]["Advent"] += (
-                            self.opts.train.lambdas.advent.adv_main * loss_main
-                        )
-                    elif self.opts.gen.s.use_advent:
-                        preds = self.G.decoders["s"](z)
-                        preds = preds.detach()
+                #         disc_loss["m"]["Advent"] += (
+                #             self.opts.train.lambdas.advent.adv_main * loss_main
+                #         )
+                #     elif self.opts.gen.s.use_advent:
+                #         preds = self.G.decoders["s"](z)
+                #         preds = preds.detach()
 
-                        loss_main = self.losses["D"]["advent"](
-                            preds.to(self.device),
-                            self.domain_labels[batch_domain],
-                            self.D["s"]["Advent"],
-                        )
+                #         loss_main = self.losses["D"]["advent"](
+                #             preds.to(self.device),
+                #             self.domain_labels[batch_domain],
+                #             self.D["s"]["Advent"],
+                #         )
 
-                        disc_loss["s"]["Advent"] += (
-                            self.opts.train.lambdas.advent.adv_main * loss_main
-                        )
+                #         disc_loss["s"]["Advent"] += (
+                #             self.opts.train.lambdas.advent.adv_main * loss_main
+                #         )
 
         self.logger.losses.disc.update(
             {
