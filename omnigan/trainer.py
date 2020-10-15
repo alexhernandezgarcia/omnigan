@@ -813,7 +813,9 @@ class Trainer:
                             ] = update_loss.item()
                         if self.opts.gen.m.common_advent:
                             prediction_s = self.G.decoders["s"](self.z)
-                            prob_all = torch.cat([prediction_s, prob], dim=1)
+                            prob_s = torch.nn.functional.softmax(prediction_s, dim=1)
+
+                            prob_all = torch.cat([prob_s, prob], dim=1)
                             d_out = self.losses["G"]["tasks"][update_task]["advent"](
                                 prob_all,
                                 self.domain_labels["s"],
@@ -877,10 +879,9 @@ class Trainer:
                         # Entropy minimization loss
                         if self.opts.gen.s.use_minent:
                             # Direct entropy minimization
+                            prob_s = torch.nn.functional.softmax(prediction, dim=1)
                             update_loss = (
-                                self.losses["G"]["tasks"][update_task]["minent"](
-                                    prediction
-                                )
+                                self.losses["G"]["tasks"][update_task]["minent"](prob_s)
                                 * lambdas.G[update_task]["minent"]
                             )
                             step_loss += update_loss
@@ -1164,8 +1165,9 @@ class Trainer:
                         fake_mask = self.G.decoders["m"](z)
                         fake_complementary_mask = 1 - fake_mask
                         preds_s = self.G.decoders["s"](z)
+                        prob_s = torch.nn.functional.softmax(preds_s, dim=1)
                         all_prob = torch.cat(
-                            [preds_s, fake_mask, fake_complementary_mask], dim=1
+                            [prob_s, fake_mask, fake_complementary_mask], dim=1
                         )
                         all_prob = all_prob.detach()
 

@@ -434,12 +434,6 @@ def get_losses(opts, verbose, device=None):
 
     if "d" in opts.tasks:
         losses["G"]["tasks"]["d"] = SIGMLoss(opts.train.lambdas.G.d.gml)
-    if "s" in opts.tasks:
-        losses["G"]["tasks"]["s"] = {}
-        losses["G"]["tasks"]["s"]["crossent"] = CrossEntropy()
-        losses["G"]["tasks"]["s"]["minent"] = MinEntLoss()
-        losses["G"]["tasks"]["s"]["advent"] = ADVENTAdversarialLoss(opts)
-        losses["G"]["tasks"]["s"]["common_advent"] = CustomBCELoss()
     if "m" in opts.tasks:
         losses["G"]["tasks"]["m"] = {}
         losses["G"]["tasks"]["m"]["bce"] = nn.BCELoss()
@@ -453,6 +447,18 @@ def get_losses(opts, verbose, device=None):
         losses["G"]["tasks"]["m"]["advent"] = ADVENTAdversarialLoss(opts)
         losses["G"]["tasks"]["m"]["compare"] = CompareLoss()
         losses["G"]["tasks"]["m"]["common_advent"] = CustomBCELoss()
+    if "s" in opts.tasks:
+        losses["G"]["tasks"]["s"] = {}
+        losses["G"]["tasks"]["s"]["crossent"] = CrossEntropy()
+        if opts.gen.s.use_minent_var:
+            losses["G"]["tasks"]["s"]["minent"] = lambda x: entropy_loss_v2(
+                x, lambda_var=opts.train.lambdas.advent.ent_var
+            )
+        else:
+            losses["G"]["tasks"]["s"]["minent"] = entropy_loss
+        losses["G"]["tasks"]["s"]["advent"] = ADVENTAdversarialLoss(opts)
+        losses["G"]["tasks"]["s"]["common_advent"] = CustomBCELoss()
+
     # undistinguishable features loss
     # TODO setup a get_losses func to assign the right loss according to the yaml
     if opts.classifier.loss == "l1":
