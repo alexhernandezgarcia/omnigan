@@ -774,13 +774,12 @@ class Trainer:
                         ] = update_loss.item()
 
                     if batch_domain == "r":
+                        prob_s = torch.nn.functional.softmax(prediction, dim=1)
                         # Entropy minimization loss
                         if self.opts.gen.s.use_minent:
                             # Direct entropy minimization
                             update_loss = (
-                                self.losses["G"]["tasks"][update_task]["minent"](
-                                    prediction
-                                )
+                                self.losses["G"]["tasks"][update_task]["minent"](prob_s)
                                 * lambdas.G[update_task]["minent"]
                             )
                             step_loss += update_loss
@@ -792,7 +791,7 @@ class Trainer:
                         # Fool ADVENT discriminator
                         if self.opts.gen.s.common_advent:
                             d_out = self.losses["G"]["tasks"][update_task]["advent"](
-                                prediction,
+                                prob_s,
                                 self.domain_labels["s"],
                                 self.D["common"]["Advent_layer_s"],
                                 d_out_only=True,
@@ -811,7 +810,7 @@ class Trainer:
                         elif self.opts.gen.s.use_advent:
                             update_loss = (
                                 self.losses["G"]["tasks"][update_task]["advent"](
-                                    prediction,
+                                    prob_s,
                                     self.domain_labels["s"],
                                     self.D["s"]["Advent"],
                                 )
@@ -1195,9 +1194,9 @@ class Trainer:
                     if self.opts.gen.s.common_advent:
                         preds = self.G.decoders["s"](z)
                         preds = preds.detach()
-
+                        prob_s = torch.nn.functional.softmax(preds, dim=1)
                         d_out = self.losses["G"]["tasks"]["s"]["advent"](
-                            preds.to(self.device),
+                            prob_s.to(self.device),
                             self.domain_labels["s"],
                             self.D["common"]["Advent_layer_s"],
                             d_out_only=True,
@@ -1214,9 +1213,9 @@ class Trainer:
                     elif self.opts.gen.s.use_advent:
                         preds = self.G.decoders["s"](z)
                         preds = preds.detach()
-
+                        prob_s = torch.nn.functional.softmax(preds, dim=1)
                         loss_main = self.losses["D"]["advent"](
-                            preds.to(self.device),
+                            prob_s.to(self.device),
                             self.domain_labels[batch_domain],
                             self.D["s"]["Advent"],
                         )
