@@ -437,7 +437,12 @@ def get_losses(opts, verbose, device=None):
     if "s" in opts.tasks:
         losses["G"]["tasks"]["s"] = {}
         losses["G"]["tasks"]["s"]["crossent"] = CrossEntropy()
-        losses["G"]["tasks"]["s"]["minent"] = MinEntLoss()
+        if opts.gen.s.use_minent_var:
+            losses["G"]["tasks"]["s"]["minent"] = lambda x: entropy_loss_v2(
+                x, lambda_var=opts.train.lambdas.advent.ent_var
+            )
+        else:
+            losses["G"]["tasks"]["s"]["minent"] = entropy_loss
         losses["G"]["tasks"]["s"]["advent"] = ADVENTAdversarialLoss(opts)
         losses["G"]["tasks"]["s"]["common_advent"] = CustomBCELoss()
     if "m" in opts.tasks:

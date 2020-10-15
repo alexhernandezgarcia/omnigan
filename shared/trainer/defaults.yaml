@@ -102,6 +102,7 @@ gen:
     output_dim: 11
     use_advent: True
     use_minent: False
+    use_minent_var: False
     use_pseudo_labels: False
     upsample_featuremaps: False # upsamples from 80x80 to 160x160 intermediate feature maps
   p: # specific params for the SPADE painter
