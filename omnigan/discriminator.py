@@ -267,9 +267,11 @@ class OmniDiscriminator(nn.ModuleDict):
         ):
             self["common"] = nn.ModuleDict(
                 {
-                    "Advent_layer_s": get_advent_layer1(num_classes=11),
-                    "Advent_layer_m": get_advent_layer1(num_classes=2),
+                    "Advent_layer_s1": get_advent_layer1(num_classes=11),
+                    "Advent_layer_m1": get_advent_layer1(num_classes=2),
                     "Advent_common_layer": get_advent_common_layers(),
+                    "Advent_layer_s2": get_advent_layer2(),
+                    "Advent_layer_m2": get_advent_layer2(),
                 }
             )
         elif "m" in opts.tasks:
@@ -328,6 +330,11 @@ def get_advent_common_layers(ndf=64):
         torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
         torch.nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1),
         torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
+    )
+
+
+def get_advent_layer2(ndf=64):
+    return torch.nn.Sequential(
         torch.nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1),
         torch.nn.LeakyReLU(negative_slope=0.2, inplace=True),
         torch.nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1),

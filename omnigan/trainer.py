@@ -793,12 +793,18 @@ class Trainer:
                             d_out = self.losses["G"]["tasks"][update_task]["advent"](
                                 prob_s,
                                 self.domain_labels["s"],
-                                self.D["common"]["Advent_layer_s"],
+                                self.D["common"]["Advent_layer_s1"],
+                                d_out_only=True,
+                            )
+                            d_out = self.losses["G"]["tasks"][update_task]["advent"](
+                                d_out,
+                                self.domain_labels["s"],
+                                self.D["common"]["Advent_common_layer"],
                                 d_out_only=True,
                             )
                             update_loss = (
                                 self.losses["G"]["tasks"][update_task]["common_advent"](
-                                    self.D["common"]["Advent_common_layer"](d_out),
+                                    self.D["common"]["Advent_layer_s2"](d_out),
                                     self.domain_labels["s"],
                                 )
                                 * lambdas.G[update_task]["advent"]
@@ -884,12 +890,18 @@ class Trainer:
                             d_out = self.losses["G"]["tasks"][update_task]["advent"](
                                 prob,
                                 self.domain_labels["s"],
-                                self.D["common"]["Advent_layer_m"],
+                                self.D["common"]["Advent_layer_m1"],
+                                d_out_only=True,
+                            )
+                            d_out = self.losses["G"]["tasks"][update_task]["advent"](
+                                d_out,
+                                self.domain_labels["s"],
+                                self.D["common"]["Advent_common_layer"],
                                 d_out_only=True,
                             )
                             update_loss = (
                                 self.losses["G"]["tasks"][update_task]["common_advent"](
-                                    self.D["common"]["Advent_common_layer"](d_out),
+                                    self.D["common"]["Advent_layer_m2"](d_out),
                                     self.domain_labels["s"],
                                 )
                                 * self.opts.train.lambdas.advent.adv_main
@@ -1162,12 +1174,17 @@ class Trainer:
                         d_out = self.losses["G"]["tasks"]["m"]["advent"](
                             prob.to(self.device),
                             self.domain_labels["s"],
-                            self.D["common"]["Advent_layer_m"],
+                            self.D["common"]["Advent_layer_m1"],
                             d_out_only=True,
                         )
-
+                        d_out = self.losses["G"]["tasks"]["m"]["advent"](
+                            d_out,
+                            self.domain_labels["s"],
+                            self.D["common"]["Advent_common_layer"],
+                            d_out_only=True,
+                        )
                         loss_main = self.losses["G"]["tasks"]["m"]["common_advent"](
-                            self.D["common"]["Advent_common_layer"](d_out),
+                            self.D["common"]["Advent_layer_m2"](d_out),
                             self.domain_labels["s"],
                         )
                         disc_loss["m"]["Advent"] += (
@@ -1198,12 +1215,17 @@ class Trainer:
                         d_out = self.losses["G"]["tasks"]["s"]["advent"](
                             prob_s.to(self.device),
                             self.domain_labels["s"],
-                            self.D["common"]["Advent_layer_s"],
+                            self.D["common"]["Advent_layer_s1"],
                             d_out_only=True,
                         )
-
+                        d_out = self.losses["G"]["tasks"]["s"]["advent"](
+                            d_out.to(self.device),
+                            self.domain_labels["s"],
+                            self.D["common"]["Advent_common_layer"],
+                            d_out_only=True,
+                        )
                         loss_main = self.losses["G"]["tasks"]["s"]["common_advent"](
-                            self.D["common"]["Advent_common_layer"](d_out),
+                            self.D["common"]["Advent_layer_s2"](d_out),
                             self.domain_labels["s"],
                         )
 
